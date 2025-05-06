@@ -25,6 +25,3 @@ setuptools.setup(
         "Operating System :: OS Independent",
     ],
 )
-
-# PS C:\Users\rob\Desktop\tts-generation-webui-main> python -m workspace.extension_openvoice_v2.extension_openvoice_v2.main
-# python -m workspace.extension_kimi_audio.extension_kimi_audio.main
