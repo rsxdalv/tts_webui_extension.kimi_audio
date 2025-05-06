@@ -334,64 +334,60 @@ def kimi_audio_stt_ui():
 
 
 def kimi_audio_tab():
-    """Main tab for Kimi Audio."""
-    with gr.Tab("Kimi Audio"):
-        gr.Markdown(
-            """
-        # Kimi Audio
-        
-        Kimi Audio is a powerful text-to-speech and speech-to-text model by Moonshot AI.
-        
+    gr.Markdown(
         """
-        )
+    # Kimi Audio
+    
+    Kimi Audio is a powerful text-to-speech and speech-to-text model by Moonshot AI.
+    """
+    )
 
-        with gr.Tabs():
-            # with gr.Tab("Text-to-Speech"):
-            #     kimi_audio_tts_ui()
+    with gr.Tabs():
+        # with gr.Tab("Text-to-Speech"):
+        #     kimi_audio_tts_ui()
 
-            with gr.Tab("Speech-to-Text"):
-                kimi_audio_stt_ui()
+        with gr.Tab("Speech-to-Text"):
+            kimi_audio_stt_ui()
 
-            with gr.Tab("Info"):
-                gr.Markdown(
-                    """
-                
-                    ## Requirements
-                    
-                    Download tab might not work, in that case:
-                    
-                    - Download the model from Hugging Face: [moonshotai/Kimi-Audio-7B-Instruct](https://huggingface.co/moonshotai/Kimi-Audio-7B-Instruct)
-                    - Place it in `data/models/kimi-audio/moonshotai/Kimi-Audio-7B-Instruct`
-                    - MoonshotAI's Whisper checkpoint might fail, in that case download the checkpoint from [here](https://huggingface.co/openai/whisper-large-v3/blob/main/model.safetensors)
-                    
-                    ## Features
-                    
-                    - Text-to-Speech: Convert text to natural-sounding speech
-                    - Speech-to-Text: Transcribe audio to text
-
-                    ## Model Sizes and VRAM:
-
-                    Detokenizer | Size on Disk | VRAM Usage |
-                    --- | --- | --- |
-                    Without Detokenizer | 27.7 GB | 22+ GB |
-                    With Detokenizer | 35+ GB | 30? GB |
-
+        with gr.Tab("Info"):
+            gr.Markdown(
                 """
-                )
+                ## Requirements
+                
+                Download tab might not work, in that case:
+                
+                - Download the model from Hugging Face: [moonshotai/Kimi-Audio-7B-Instruct](https://huggingface.co/moonshotai/Kimi-Audio-7B-Instruct)
+                - Place it in `data/models/kimi-audio/moonshotai/Kimi-Audio-7B-Instruct`
+                - MoonshotAI's Whisper checkpoint might fail, in that case download the checkpoint from [here](https://huggingface.co/openai/whisper-large-v3/blob/main/model.safetensors)
+                
+                ## Features
+                
+                - Text-to-Speech: Convert text to natural-sounding speech
+                - Speech-to-Text: Transcribe audio to text
 
-            with gr.Tab("Download"):
-                gr.Markdown(
-                    """
-                    ## Download the model from Hugging Face: [moonshotai/Kimi-Audio-7B-Instruct](https://huggingface.co/moonshotai/Kimi-Audio-7B-Instruct)
-                    ## Place it in `data/models/kimi-audio/moonshotai/Kimi-Audio-7B-Instruct`
-                    """
-                )
+                ## Model Sizes and VRAM:
 
-                gr.Button("Download Model", variant="primary").click(
-                    fn=download_model,
-                    inputs=[],
-                    outputs=[gr.Markdown()],
-                )
+                Detokenizer | Size on Disk | VRAM Usage |
+                --- | --- | --- |
+                Without Detokenizer | 27.7 GB | 22+ GB |
+                With Detokenizer | 35+ GB | 30? GB |
+            """
+            )
+
+        with gr.Tab("Download"):
+            gr.Markdown(
+                """
+                ## Download Model
+                
+                Click the button below to download the Kimi Audio model.
+                """
+            )
+
+            gr.Button("Download Model", variant="primary").click(
+                fn=download_model,
+                inputs=[],
+                outputs=[gr.Markdown()],
+            )
 
 
 def ui():
