@@ -21,6 +21,21 @@ from tts_webui.extensions_loader.decorator_extensions import (
 )
 
 
+def download_model(
+    model_path: str = "data/models/kimi-audio/moonshotai/Kimi-Audio-7B-Instruct",
+):
+    from huggingface_hub import snapshot_download
+
+    snapshot_download(
+        "moonshotai/Kimi-Audio-7B-Instruct",
+        repo_type="model",
+        local_dir=model_path,
+        local_dir_use_symlinks=False,
+    )
+
+    return "ok"
+
+
 @manage_model_state("kimi_audio")
 def get_kimi_audio_model(
     model_path: str = "data/models/kimi-audio/moonshotai/Kimi-Audio-7B-Instruct",
@@ -67,6 +82,7 @@ def generate_speech(
 
     return {"audio_out": (sample_rate, wav_output)}
 
+
 def audio_to_text(
     audio: str,
     model_path: str = "data/models/kimi-audio/moonshotai/Kimi-Audio-7B-Instruct",
@@ -91,16 +107,23 @@ def audio_to_text(
     # --- 3. Example 1: Audio-to-Text (ASR) ---
     messages_asr = [
         # You can provide context or instructions as text
-        {"role": "user", "message_type": "text", "content": "Please transcribe the following audio:"},
+        {
+            "role": "user",
+            "message_type": "text",
+            "content": "Please transcribe the following audio:",
+        },
         # Provide the audio file path
-        {"role": "user", "message_type": "audio", "content": audio}
+        {"role": "user", "message_type": "audio", "content": audio},
     ]
 
     # Generate only text output
     _, text_output = model.generate(messages_asr, **sampling_params, output_type="text")
-    print(">>> ASR Output Text: ", text_output) # Expected output: "这并不是告别，这是一个篇章的结束，也是新篇章的开始。"
+    print(
+        ">>> ASR Output Text: ", text_output
+    )  # Expected output: "这并不是告别，这是一个篇章的结束，也是新篇章的开始。"
 
     return {"text_out": text_output}
+
 
 def audio_to_text_conversation(
     audio: str,
@@ -131,13 +154,15 @@ def audio_to_text_conversation(
 
     # Generate both audio and text output
     # wav_output, text_output = model.generate(messages_conversation, **sampling_params, output_type="both")
-    _, text_output = model.generate(messages_conversation, **sampling_params, output_type="text")
-    
+    _, text_output = model.generate(
+        messages_conversation, **sampling_params, output_type="text"
+    )
+
     # Save the generated audio
     # output_audio_path = "output_audio.wav"
     # sf.write(output_audio_path, wav_output.detach().cpu().view(-1).numpy(), 24000) # Assuming 24kHz output
     # print(f">>> Conversational Output Audio saved to: {output_audio_path}")
-    print(">>> Conversational Output Text: ", text_output) # Expected output: "A."
+    print(">>> Conversational Output Text: ", text_output)  # Expected output: "A."
 
     print("Kimi-Audio inference examples complete.")
 
@@ -272,7 +297,9 @@ def kimi_audio_stt_ui():
             unload_model_button("kimi_audio")
 
             transcribe_btn = gr.Button("Transcribe Audio", variant="primary")
-            conversation_btn = gr.Button("Transcript to Conversation", variant="primary")
+            conversation_btn = gr.Button(
+                "Transcript to Conversation", variant="primary"
+            )
 
         with gr.Column():
             text_output = gr.Textbox(label="Transcription", lines=5)
@@ -315,28 +342,6 @@ def kimi_audio_tab():
         
         Kimi Audio is a powerful text-to-speech and speech-to-text model by Moonshot AI.
         
-        ## Requirements
-        
-        - Download the model from Hugging Face: [moonshotai/Kimi-Audio-7B-Instruct](https://huggingface.co/moonshotai/Kimi-Audio-7B-Instruct)
-        - Place it in `data/models/kimi-audio/moonshotai/Kimi-Audio-7B-Instruct`
-        
-        ## Features
-        
-        - Text-to-Speech: Convert text to natural-sounding speech
-        - Speech-to-Text: Transcribe audio to text
-
-        ## Model Sizes and VRAM:
-
-        ### Without Detokenizer:
-
-        - Size on disk: 27.7 GB
-        - VRAM usage: 22+ GB
-
-        
-        ### With Detokenizer:
-
-        - Size on disk: 35+ GB
-        - VRAM usage: 30? GB
         """
         )
 
@@ -346,6 +351,47 @@ def kimi_audio_tab():
 
             with gr.Tab("Speech-to-Text"):
                 kimi_audio_stt_ui()
+
+            with gr.Tab("Info"):
+                gr.Markdown(
+                    """
+                
+                    ## Requirements
+                    
+                    Download tab might not work, in that case:
+                    
+                    - Download the model from Hugging Face: [moonshotai/Kimi-Audio-7B-Instruct](https://huggingface.co/moonshotai/Kimi-Audio-7B-Instruct)
+                    - Place it in `data/models/kimi-audio/moonshotai/Kimi-Audio-7B-Instruct`
+                    - MoonshotAI's Whisper checkpoint might fail, in that case download the checkpoint from [here](https://huggingface.co/openai/whisper-large-v3/blob/main/model.safetensors)
+                    
+                    ## Features
+                    
+                    - Text-to-Speech: Convert text to natural-sounding speech
+                    - Speech-to-Text: Transcribe audio to text
+
+                    ## Model Sizes and VRAM:
+
+                    Detokenizer | Size on Disk | VRAM Usage |
+                    --- | --- | --- |
+                    Without Detokenizer | 27.7 GB | 22+ GB |
+                    With Detokenizer | 35+ GB | 30? GB |
+
+                """
+                )
+
+            with gr.Tab("Download"):
+                gr.Markdown(
+                    """
+                    ## Download the model from Hugging Face: [moonshotai/Kimi-Audio-7B-Instruct](https://huggingface.co/moonshotai/Kimi-Audio-7B-Instruct)
+                    ## Place it in `data/models/kimi-audio/moonshotai/Kimi-Audio-7B-Instruct`
+                    """
+                )
+
+                gr.Button("Download Model", variant="primary").click(
+                    fn=download_model,
+                    inputs=[],
+                    outputs=[gr.Markdown()],
+                )
 
 
 def ui():

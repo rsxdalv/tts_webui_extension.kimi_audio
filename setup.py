@@ -12,8 +12,11 @@ setuptools.setup(
     install_requires=[
         "kimia_infer @ https://github.com/rsxdalv/Kimi-Audio/releases/download/v0.1.7/kimia_infer-0.1.7-cp310-cp310-win_amd64.whl ; sys_platform == 'win32'",
         "kimia_infer @ https://github.com/rsxdalv/Kimi-Audio/releases/download/v0.1.7/kimia_infer-0.1.7-cp310-cp310-linux_x86_64.whl ; sys_platform == 'linux'",
-        "kimia_infer @ https://github.com/rsxdalv/Kimi-Audio/releases/download/v0.1.7/kimia_infer-0.1.7-cp310-cp310-macosx_11_0_universal2.whl ; sys_platform == 'darwin'",
+        # Mac wheel does not exist yet
+        # "kimia_infer @ https://github.com/rsxdalv/Kimi-Audio/releases/download/v0.1.7/kimia_infer-0.1.7-cp310-cp310-macosx_11_0_universal2.whl ; sys_platform == 'darwin'",
         "soundfile",
+        "flash-attn @ https://github.com/kingbri1/flash-attention/releases/download/v2.7.4.post1/flash_attn-2.7.4.post1+cu124torch2.6.0cxx11abiFALSE-cp310-cp310-win_amd64.whl ; sys_platform == 'win32'",
+        "flash-attn @ https://github.com/Dao-AILab/flash-attention/releases/download/v2.7.4.post1/flash_attn-2.7.4.post1+cu12torch2.6cxx11abiFALSE-cp310-cp310-linux_x86_64.whl ; sys_platform == 'linux'",
         # "transformers>=4.51.3",
     ],
     classifiers=[
