@@ -1,24 +1,22 @@
-import os
-import torch
 import gradio as gr
-import soundfile as sf
-import numpy as np
-from typing import Optional, Tuple, Dict, Any, List
-import tempfile
+from typing import Dict, Any
 
-from tts_webui.utils.manage_model_state import manage_model_state
-from tts_webui.utils.list_dir_models import unload_model_button
-from tts_webui.history_tab.save_to_favorites import save_to_favorites
-from tts_webui.decorators.gradio_dict_decorator import dictionarize
-from tts_webui.decorators.decorator_save_wav import decorator_save_wav
 from tts_webui.decorators.decorator_add_base_filename import decorator_add_base_filename
 from tts_webui.decorators.decorator_add_date import decorator_add_date
 from tts_webui.decorators.decorator_add_model_type import decorator_add_model_type
+from tts_webui.decorators.decorator_apply_torch_seed import decorator_apply_torch_seed
+from tts_webui.decorators.decorator_log_generation import decorator_log_generation
+from tts_webui.decorators.decorator_save_metadata import decorator_save_metadata
+from tts_webui.decorators.decorator_save_wav import decorator_save_wav
+from tts_webui.decorators.gradio_dict_decorator import dictionarize
 from tts_webui.decorators.log_function_time import log_function_time
 from tts_webui.extensions_loader.decorator_extensions import (
-    decorator_extension_outer,
     decorator_extension_inner,
+    decorator_extension_outer,
 )
+from tts_webui.utils.list_dir_models import unload_model_button
+from tts_webui.utils.manage_model_state import manage_model_state
+from tts_webui.utils.randomize_seed import randomize_seed_ui
 
 
 def download_model(
@@ -46,81 +44,104 @@ def get_kimi_audio_model(
     return KimiAudio(model_path=model_path, load_detokenizer=load_detokenizer)
 
 
-# @decorator_extension_outer
-# @decorator_apply_torch_seed
-# @decorator_save_metadata
-# @decorator_save_wav
-# @decorator_add_model_type("kimi_audio")
-# @decorator_add_base_filename
-# @decorator_add_date
-# @decorator_log_generation
-# @decorator_extension_inner
-# @log_function_time
+@decorator_extension_outer
+@decorator_apply_torch_seed
+@decorator_save_metadata
+@decorator_save_wav
+@decorator_add_model_type("kimi_audio")
+@decorator_add_base_filename
+@decorator_add_date
+@decorator_log_generation
+@decorator_extension_inner
+@log_function_time
 def generate_speech(
+    audio: str,
     text: str,
     model_path: str = "data/models/kimi-audio/moonshotai/Kimi-Audio-7B-Instruct",
-    temperature: float = 0.7,
-    top_p: float = 0.9,
-    max_new_tokens: int = 1024,
-    **kwargs
+    audio_temperature: float = 0.8,
+    audio_top_k: int = 10,
+    text_temperature: float = 0.0,
+    text_top_k: int = 5,
+    audio_repetition_penalty: float = 1.0,
+    audio_repetition_window_size: int = 64,
+    text_repetition_penalty: float = 1.0,
+    text_repetition_window_size: int = 16,
+    **kwargs,
 ) -> Dict[str, Any]:
     """Generate speech from text using Kimi Audio."""
     model = get_kimi_audio_model(model_path, load_detokenizer=True)
 
-    # Generate speech
-    wav_output, sample_rate = model.generate_speech(
-        text=text, temperature=temperature, top_p=top_p, max_new_tokens=max_new_tokens
+    sampling_params = {
+        "audio_temperature": audio_temperature,
+        "audio_top_k": audio_top_k,
+        "text_temperature": text_temperature,
+        "text_top_k": text_top_k,
+        "audio_repetition_penalty": audio_repetition_penalty,
+        "audio_repetition_window_size": audio_repetition_window_size,
+        "text_repetition_penalty": text_repetition_penalty,
+        "text_repetition_window_size": text_repetition_window_size,
+    }
+
+    # {"role": "user", "message_type": "text", "content": text},
+    # {"role": "user", "message_type": "audio", "content": audio},
+    if audio is not None:
+        message = {"role": "user", "message_type": "audio", "content": audio}
+    else:
+        # this cannot run
+        gr.Info("Cannot be run without audio")
+        message = {"role": "user", "message_type": "text", "content": text}
+
+    messages_conversation = [message]
+
+    # Generate both audio and text output
+    wav_output, text_output = model.generate(
+        messages_conversation, **sampling_params, output_type="both"
     )
 
-    # Convert to numpy array
-    if isinstance(wav_output, torch.Tensor):
-        wav_output = wav_output.detach().cpu().numpy()
+    sample_rate = 24_000
 
-    # Ensure the audio is in the right format
-    if len(wav_output.shape) > 1 and wav_output.shape[0] == 1:
-        wav_output = wav_output.squeeze(0)
-
-    return {"audio_out": (sample_rate, wav_output)}
+    return {
+        "audio_out": (sample_rate, wav_output.detach().cpu().view(-1).numpy()),
+        "text_out": text_output,
+    }
 
 
 def audio_to_text(
     audio: str,
     model_path: str = "data/models/kimi-audio/moonshotai/Kimi-Audio-7B-Instruct",
-    temperature: float = 0.7,
-    top_p: float = 0.9,
-    max_new_tokens: int = 1024,
-    **kwargs
+    audio_temperature: float = 0.8,
+    audio_top_k: int = 10,
+    text_temperature: float = 0.0,
+    text_top_k: int = 5,
+    audio_repetition_penalty: float = 1.0,
+    audio_repetition_window_size: int = 64,
+    text_repetition_penalty: float = 1.0,
+    text_repetition_window_size: int = 16,
+    **kwargs,
 ):
     model = get_kimi_audio_model(model_path)
 
     sampling_params = {
-        "audio_temperature": 0.8,
-        "audio_top_k": 10,
-        "text_temperature": 0.0,
-        "text_top_k": 5,
-        "audio_repetition_penalty": 1.0,
-        "audio_repetition_window_size": 64,
-        "text_repetition_penalty": 1.0,
-        "text_repetition_window_size": 16,
+        "audio_temperature": audio_temperature,
+        "audio_top_k": audio_top_k,
+        "text_temperature": text_temperature,
+        "text_top_k": text_top_k,
+        "audio_repetition_penalty": audio_repetition_penalty,
+        "audio_repetition_window_size": audio_repetition_window_size,
+        "text_repetition_penalty": text_repetition_penalty,
+        "text_repetition_window_size": text_repetition_window_size,
     }
 
-    # --- 3. Example 1: Audio-to-Text (ASR) ---
     messages_asr = [
-        # You can provide context or instructions as text
         {
             "role": "user",
             "message_type": "text",
             "content": "Please transcribe the following audio:",
         },
-        # Provide the audio file path
         {"role": "user", "message_type": "audio", "content": audio},
     ]
 
-    # Generate only text output
     _, text_output = model.generate(messages_asr, **sampling_params, output_type="text")
-    print(
-        ">>> ASR Output Text: ", text_output
-    )  # Expected output: "这并不是告别，这是一个篇章的结束，也是新篇章的开始。"
 
     return {"text_out": text_output}
 
@@ -128,104 +149,77 @@ def audio_to_text(
 def audio_to_text_conversation(
     audio: str,
     model_path: str = "data/models/kimi-audio/moonshotai/Kimi-Audio-7B-Instruct",
-    temperature: float = 0.7,
-    top_p: float = 0.9,
-    max_new_tokens: int = 1024,
-    **kwargs
+    audio_temperature: float = 0.8,
+    audio_top_k: int = 10,
+    text_temperature: float = 0.0,
+    text_top_k: int = 5,
+    audio_repetition_penalty: float = 1.0,
+    audio_repetition_window_size: int = 64,
+    text_repetition_penalty: float = 1.0,
+    text_repetition_window_size: int = 16,
+    **kwargs,
 ):
     model = get_kimi_audio_model(model_path)
 
     sampling_params = {
-        "audio_temperature": 0.8,
-        "audio_top_k": 10,
-        "text_temperature": 0.0,
-        "text_top_k": 5,
-        "audio_repetition_penalty": 1.0,
-        "audio_repetition_window_size": 64,
-        "text_repetition_penalty": 1.0,
-        "text_repetition_window_size": 16,
+        "audio_temperature": audio_temperature,
+        "audio_top_k": audio_top_k,
+        "text_temperature": text_temperature,
+        "text_top_k": text_top_k,
+        "audio_repetition_penalty": audio_repetition_penalty,
+        "audio_repetition_window_size": audio_repetition_window_size,
+        "text_repetition_penalty": text_repetition_penalty,
+        "text_repetition_window_size": text_repetition_window_size,
     }
-    # --- 4. Example 2: Audio-to-Audio/Text Conversation ---
+
     messages_conversation = [
-        # Start conversation with an audio query
-        # {"role": "user", "message_type": "audio", "content": "test_audios/qa_example.wav"}
         {"role": "user", "message_type": "audio", "content": audio}
     ]
 
-    # Generate both audio and text output
-    # wav_output, text_output = model.generate(messages_conversation, **sampling_params, output_type="both")
     _, text_output = model.generate(
         messages_conversation, **sampling_params, output_type="text"
     )
 
-    # Save the generated audio
-    # output_audio_path = "output_audio.wav"
-    # sf.write(output_audio_path, wav_output.detach().cpu().view(-1).numpy(), 24000) # Assuming 24kHz output
-    # print(f">>> Conversational Output Audio saved to: {output_audio_path}")
-    print(">>> Conversational Output Text: ", text_output)  # Expected output: "A."
-
-    print("Kimi-Audio inference examples complete.")
-
-    # return {"text_out": text_output, "audio_out": (24000, wav_output.detach().cpu().view(-1).numpy())}
     return {"text_out": text_output}
 
 
-# @decorator_extension_outer
-# # @decorator_save_wav
-# @decorator_add_model_type("kimi_audio")
-# @decorator_add_base_filename
-# @decorator_add_date
-# @decorator_extension_inner
-# @log_function_time
-def transcribe_audio(
-    audio: str,
-    model_path: str = "data/models/kimi-audio/moonshotai/Kimi-Audio-7B-Instruct",
-    temperature: float = 0.7,
-    top_p: float = 0.9,
-    max_new_tokens: int = 1024,
-    **kwargs
-) -> Dict[str, Any]:
-    """Transcribe audio to text using Kimi Audio."""
-    model = get_kimi_audio_model(model_path)
-
-    # Load audio file
-    audio_array, sample_rate = sf.read(audio)
-
-    # Transcribe audio
-    transcription = model.transcribe_audio(
-        audio=audio_array,
-        sr=sample_rate,
-        temperature=temperature,
-        top_p=top_p,
-        max_new_tokens=max_new_tokens,
-    )
-
-    return {"text_out": transcription, "audio_in": (sample_rate, audio_array)}
-
-
 def kimi_audio_tts_ui():
-    """UI for Kimi Audio text-to-speech."""
     with gr.Row():
         with gr.Column():
             text_input = gr.Textbox(
                 label="Text Input",
                 placeholder="Enter text to convert to speech...",
                 lines=5,
+                visible=False,
+            )
+            audio_input = gr.Audio(
+                label="Audio Input", type="filepath", sources="upload"
             )
 
             with gr.Row():
-                temperature = gr.Slider(
-                    minimum=0.1, maximum=1.5, value=0.7, step=0.1, label="Temperature"
+                audio_temperature = gr.Slider(
+                    minimum=0.1, maximum=1.5, value=0.8, step=0.1, label="Audio Temperature"
                 )
-                top_p = gr.Slider(
-                    minimum=0.1, maximum=1.0, value=0.9, step=0.1, label="Top P"
+                text_temperature = gr.Slider(
+                    minimum=0.0, maximum=1.5, value=0.0, step=0.1, label="Text Temperature"
                 )
-                max_new_tokens = gr.Slider(
-                    minimum=128,
-                    maximum=2048,
-                    value=1024,
-                    step=128,
-                    label="Max New Tokens",
+                audio_top_k = gr.Slider(
+                    minimum=1, maximum=100, value=10, step=1, label="Audio Top K"
+                )
+                text_top_k = gr.Slider(
+                    minimum=1, maximum=100, value=5, step=1, label="Text Top K"
+                )
+                audio_repetition_penalty = gr.Slider(
+                    minimum=0.1, maximum=2.0, value=1.0, step=0.1, label="Audio Repetition Penalty"
+                )
+                audio_repetition_window_size = gr.Slider(
+                    minimum=1, maximum=128, value=64, step=1, label="Audio Repetition Window Size"
+                )
+                text_repetition_penalty = gr.Slider(
+                    minimum=0.1, maximum=2.0, value=1.0, step=0.1, label="Text Repetition Penalty"
+                )
+                text_repetition_window_size = gr.Slider(
+                    minimum=1, maximum=128, value=16, step=1, label="Text Repetition Window Size"
                 )
 
             model_path = gr.Textbox(
@@ -240,29 +234,35 @@ def kimi_audio_tts_ui():
 
         with gr.Column():
             audio_output = gr.Audio(label="Generated Speech", type="numpy")
-            with gr.Row():
-                folder_root = gr.Textbox(visible=False)
-                save_button = gr.Button("Save to favorites", visible=True)
+            text_output = gr.Textbox(label="Generated Text", lines=5)
 
-            save_button.click(
-                fn=save_to_favorites,
-                inputs=[folder_root],
-                outputs=[save_button],
-            )
+            seed, randomize_seed_callback = randomize_seed_ui()
 
     inputs_dict = {
         text_input: "text",
+        audio_input: "audio",
         model_path: "model_path",
-        temperature: "temperature",
-        top_p: "top_p",
-        max_new_tokens: "max_new_tokens",
+        audio_temperature: "audio_temperature",
+        audio_top_k: "audio_top_k",
+        text_temperature: "text_temperature",
+        text_top_k: "text_top_k",
+        audio_repetition_penalty: "audio_repetition_penalty",
+        audio_repetition_window_size: "audio_repetition_window_size",
+        text_repetition_penalty: "text_repetition_penalty",
+        text_repetition_window_size: "text_repetition_window_size",
+        seed: "seed",
     }
 
-    outputs_dict = {"audio_out": audio_output, "folder_root": folder_root}
+    outputs_dict = {
+        "audio_out": audio_output,
+        "text_out": text_output,
+        "metadata": gr.JSON(visible=False),
+        "folder_root": gr.Textbox(visible=False),
+    }
 
     generate_btn.click(
-        **dictionarize(fn=generate_speech, inputs=inputs_dict, outputs=outputs_dict)
-    )
+        **randomize_seed_callback,
+    ).then(**dictionarize(fn=generate_speech, inputs=inputs_dict, outputs=outputs_dict))
 
 
 def kimi_audio_stt_ui():
@@ -274,18 +274,29 @@ def kimi_audio_stt_ui():
             )
 
             with gr.Row():
-                temperature = gr.Slider(
-                    minimum=0.1, maximum=1.5, value=0.7, step=0.1, label="Temperature"
+                audio_temperature = gr.Slider(
+                    minimum=0.1, maximum=1.5, value=0.8, step=0.1, label="Audio Temperature"
                 )
-                top_p = gr.Slider(
-                    minimum=0.1, maximum=1.0, value=0.9, step=0.1, label="Top P"
+                text_temperature = gr.Slider(
+                    minimum=0.0, maximum=1.5, value=0.0, step=0.1, label="Text Temperature"
                 )
-                max_new_tokens = gr.Slider(
-                    minimum=128,
-                    maximum=2048,
-                    value=1024,
-                    step=128,
-                    label="Max New Tokens",
+                audio_top_k = gr.Slider(
+                    minimum=1, maximum=100, value=10, step=1, label="Audio Top K"
+                )
+                text_top_k = gr.Slider(
+                    minimum=1, maximum=100, value=5, step=1, label="Text Top K"
+                )
+                audio_repetition_penalty = gr.Slider(
+                    minimum=0.1, maximum=2.0, value=1.0, step=0.1, label="Audio Repetition Penalty"
+                )
+                audio_repetition_window_size = gr.Slider(
+                    minimum=1, maximum=128, value=64, step=1, label="Audio Repetition Window Size"
+                )
+                text_repetition_penalty = gr.Slider(
+                    minimum=0.1, maximum=2.0, value=1.0, step=0.1, label="Text Repetition Penalty"
+                )
+                text_repetition_window_size = gr.Slider(
+                    minimum=1, maximum=128, value=16, step=1, label="Text Repetition Window Size"
                 )
 
             model_path = gr.Textbox(
@@ -304,34 +315,36 @@ def kimi_audio_stt_ui():
         with gr.Column():
             text_output = gr.Textbox(label="Transcription", lines=5)
 
-    transcribe_btn.click(
+            seed, randomize_seed_callback = randomize_seed_ui()
+
+    common_inputs = {
+        audio_input: "audio",
+        model_path: "model_path",
+        audio_temperature: "audio_temperature",
+        audio_top_k: "audio_top_k",
+        text_temperature: "text_temperature",
+        text_top_k: "text_top_k",
+        audio_repetition_penalty: "audio_repetition_penalty",
+        audio_repetition_window_size: "audio_repetition_window_size",
+        text_repetition_penalty: "text_repetition_penalty",
+        text_repetition_window_size: "text_repetition_window_size",
+        seed: "seed",
+    }
+
+    transcribe_btn.click(**randomize_seed_callback).then(
         **dictionarize(
-            # fn=transcribe_audio,
             fn=audio_to_text,
-            inputs={
-                audio_input: "audio",
-                model_path: "model_path",
-                temperature: "temperature",
-                top_p: "top_p",
-                max_new_tokens: "max_new_tokens",
-            },
+            inputs=common_inputs,
             outputs={"text_out": text_output},
         )
     )
-    conversation_btn.click(
+    conversation_btn.click(**randomize_seed_callback).then(
         **dictionarize(
             fn=audio_to_text_conversation,
-            inputs={
-                audio_input: "audio",
-                model_path: "model_path",
-                temperature: "temperature",
-                top_p: "top_p",
-                max_new_tokens: "max_new_tokens",
-            },
+            inputs=common_inputs,
             outputs={"text_out": text_output},
         )
     )
-
 
 def kimi_audio_tab():
     gr.Markdown(
@@ -343,10 +356,10 @@ def kimi_audio_tab():
     )
 
     with gr.Tabs():
-        # with gr.Tab("Text-to-Speech"):
-        #     kimi_audio_tts_ui()
+        with gr.Tab("Conversation-Based Speech generation"):
+            kimi_audio_tts_ui()
 
-        with gr.Tab("Speech-to-Text"):
+        with gr.Tab("Conversation based Speech-to-Text"):
             kimi_audio_stt_ui()
 
         with gr.Tab("Info"):
