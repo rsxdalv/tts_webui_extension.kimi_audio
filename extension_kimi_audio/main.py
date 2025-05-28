@@ -416,7 +416,6 @@ def extension__tts_generation_webui():
     return {
         "package_name": "extension_kimi_audio",
         "name": "Kimi Audio",
-        "version": "0.0.1",
         "requirements": "git+https://github.com/rsxdalv/extension_kimi_audio@main",
         "description": "Kimi Audio is a powerful text-to-speech and speech-to-text model by Moonshot AI",
         "extension_type": "interface",
